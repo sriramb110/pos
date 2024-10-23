@@ -1,12 +1,9 @@
 const express = require('express');
 const Joi = require('joi');
-const User = require('./models/User');
+const User = require('../models/user.js');
 const bcrypt = require('bcryptjs');
-const nodemailer = require('nodemailer');
-const jwt = require('jsonwebtoken');
-
+const sendEmail = require('./mail');
 const router = express.Router();
-const secretKey = 'yourSecretKey';
 
 const signupSchema = Joi.object({
   username: Joi.string().min(3).max(30).required(),
@@ -14,39 +11,8 @@ const signupSchema = Joi.object({
   dob: Joi.date().iso().required(),
   phoneNumber: Joi.string().pattern(/^[0-9]{10}$/).required(),
   businessName: Joi.string().min(2).required(),
-  emailId: Joi.string().email().required(), 
+  emailId: Joi.string().email().required(),
 });
-
-const sendConfirmationEmail = async (emailId, token) => {
-  try {
-    // Create a transporter object using SMTP transport
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',  // Using Gmail as an example
-      auth: {
-        user: process.env.EMAIL_USER, 
-        pass: process.env.EMAIL_PASS  
-      }
-    });
-
-    // Define email options
-    const mailOptions = {
-      from: 'your-email@gmail.com',
-      to: emailId,  // User's email
-      subject: 'Confirm your email address',
-      text: `Thank you for signing up! Please confirm your email by clicking on the link: 
-      http://your-frontend-url/confirm-email?token=${token}`,  // Email text with the confirmation link
-      html: `<p>Thank you for signing up! Please confirm your email by clicking on the link below:</p>
-      <a href="http://your-frontend-url/confirm-email?token=${token}">Confirm Email</a>`  // HTML email body
-    };
-
-    // Send email
-    const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent: ' + info.response);
-  } catch (error) {
-    console.error('Error sending email: ', error);
-    throw error;
-  }
-};
 
 router.post('/', async (req, res) => {
   try {
@@ -59,6 +25,7 @@ router.post('/', async (req, res) => {
     const existingUser = await User.findOne({
       $or: [{ username }, { emailId }, { phoneNumber }]
     });
+
     if (existingUser) {
       if (existingUser.username === username) {
         return res.status(400).json({ message: 'Username already exists' });
@@ -81,21 +48,46 @@ router.post('/', async (req, res) => {
     });
 
     await newUser.save();
-    
-    // Send response first
-    res.status(201).json({ message: 'User registered successfully!' });
 
-    // Send email asynchronously after the response
-    const token = jwt.sign({ emailId }, secretKey, { expiresIn: '1h' });
-    await sendConfirmationEmail(emailId, token);
+    const emailSubject = 'Welcome! Please Confirm Your Email';
+    const emailText = `Hello ${name},\n\nThank you for registering.`;
+    const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        .button {
+          display: inline-block;
+          padding: 10px 20px;
+          font-size: 16px;
+          color: #ffffff;
+          background-color: #2590df; 
+          text-decoration: none;
+          border-radius: 5px;
+        }
+        .button:hover {
+          background-color: #0056b3;
+        }
+      </style>
+    </head>
+    <body>
+      <p>Hello ${name},</p>
+      <p>Thank you for registering. Please set your password by clicking the button below:</p>
+      <a href="https://your-website.com/set-password?username=${username}" class="button">Set Password</a>
+      <p>Best Regards,<br>Your Team</p>
+    </body>
+    </html>
+    `;
+
+    await sendEmail(emailId, emailSubject, emailText,html);
+
+    res.status(201).json({ message: 'User registered successfully! A confirmation email has been sent.' });
 
   } catch (err) {
     console.error('Error:', err.message);
-    // Send error response
     res.status(500).json({ message: 'Internal server error', error: err.message });
   }
 });
-
 
 router.patch('/set-password', async (req, res) => {
   try {
@@ -105,16 +97,12 @@ router.patch('/set-password', async (req, res) => {
       return res.status(400).json({ message: 'Username and password are required' });
     }
 
-    // Find the user by username
     const user = await User.findOne({ username });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Hash the password
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Update the user's password
     user.password = hashedPassword;
     await user.save();
 

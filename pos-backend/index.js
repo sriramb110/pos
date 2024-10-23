@@ -1,8 +1,9 @@
-require('dotenv').config(); 
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');  // Import CORS
 const signup = require('./api/signup');
+const sendEmail = require('./api/mail'); // Import the sendEmail function
 const app = express();
 
 app.use(express.json());
@@ -25,6 +26,19 @@ app.get('/', (req, res) => {
 
 app.use('/api/signup', signup); 
 
+app.post('/send-email', (req, res) => {
+  const { to, subject, text } = req.body;
+  
+  sendEmail(to, subject, text)
+    .then((info) => {
+      console.log('Email sent successfully:', info.response);
+      res.status(200).json({ message: 'Email sent successfully', info });
+    })
+    .catch((error) => {
+      console.log('Error sending email:', error);
+      res.status(500).json({ message: 'Error sending email', error });
+    });
+});
 
 // Start the server
 app.listen(port, () => {
