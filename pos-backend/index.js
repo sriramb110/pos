@@ -3,6 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');  // Import CORS
 const signup = require('./api/signup');
+const login = require('./api/login');
 const sendEmail = require('./api/mail'); // Import the sendEmail function
 const app = express();
 
@@ -26,9 +27,11 @@ app.get('/', (req, res) => {
 
 app.use('/api/signup', signup); 
 
+app.use('/api/signin', login); 
+
 app.post('/send-email', (req, res) => {
   const { to, subject, text } = req.body;
-  
+
   sendEmail(to, subject, text)
     .then((info) => {
       console.log('Email sent successfully:', info.response);

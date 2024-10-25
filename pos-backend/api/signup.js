@@ -1,8 +1,11 @@
+require('dotenv').config(); // Load environment variables
+
 const express = require('express');
 const Joi = require('joi');
 const User = require('../models/user.js');
 const bcrypt = require('bcryptjs');
 const sendEmail = require('./mail');
+const jwt = require('jsonwebtoken');
 const router = express.Router();
 
 const signupSchema = Joi.object({
@@ -47,6 +50,11 @@ router.post('/', async (req, res) => {
       emailId,
     });
 
+    // Generate a temporary token
+    const token = jwt.sign({ username, emailId }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    newUser.token = token;
+    newUser.tokenExpiration = Date.now() + 3600000;
+
     await newUser.save();
 
     const emailSubject = 'Welcome! Please Confirm Your Email';
@@ -73,13 +81,13 @@ router.post('/', async (req, res) => {
     <body>
       <p>Hello ${name},</p>
       <p>Thank you for registering. Please set your password by clicking the button below:</p>
-      <a href="https://your-website.com/set-password?username=${username}" class="button">Set Password</a>
+      <a href="http://localhost:3000/Setpassword/${token}" class="button">Set Password</a>
       <p>Best Regards,<br>Your Team</p>
     </body>
     </html>
     `;
 
-    await sendEmail(emailId, emailSubject, emailText,html);
+    await sendEmail(emailId, emailSubject, emailText, html);
 
     res.status(201).json({ message: 'User registered successfully! A confirmation email has been sent.' });
 
@@ -89,21 +97,32 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.patch('/set-password', async (req, res) => {
+// Password setting route with token verification
+router.patch('/set-password/:token', async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { token } = req.params;
+    const { password } = req.body;
 
-    if (!username || !password) {
-      return res.status(400).json({ message: 'Username and password are required' });
+    if (!password) {
+      return res.status(400).json({ message: 'Password is required' });
     }
 
-    const user = await User.findOne({ username });
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(400).json({ message: 'Invalid or expired token' });
+    }
+
+    const user = await User.findOne({ username: decoded.username });
+    if (!user || user.token !== token || Date.now() > user.tokenExpiration) {
+      return res.status(404).json({ message: 'User not found or token expired' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     user.password = hashedPassword;
+    user.token = undefined; 
+    user.tokenExpiration = undefined; 
     await user.save();
 
     res.status(200).json({ message: 'Password updated successfully' });

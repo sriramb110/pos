@@ -38,7 +38,9 @@ const userSchema = new mongoose.Schema({
     unique: true,
     minlength: 3,
     maxlength: 30,
-  }
+  },
+  token: { type: String },  
+  tokenExpiration: { type: Date } 
 });
 
 // Create the User model
