@@ -33,12 +33,12 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'Invalid username or password' });
     }
 
-    const payload = { userId: user._id, username: user.username, emailId: user.emailId };
+    const payload = { userId: user._id, username: user.username, emailId: user.emailId,business: user.businessName };    
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '8h' });
 
     res.status(200).json({
-      message: 'Login successful',
+      message: 'Login successful',  
       token, 
     });
   } catch (err) {
