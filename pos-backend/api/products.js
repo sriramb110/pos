@@ -10,17 +10,13 @@ const ProductSchema = new mongoose.Schema({
     amount: { type: Number, required: true }
 });
 
-// Add a partial unique index for productName, categoryType, and businessName
-ProductSchema.index({ productName: 1, categoryType: 1, businessName: 1 }, { unique: true });
+ProductSchema.index({ productName: 1, categoryType: 1, businessName: 1, amount:1 }, { unique: true });
 
 const Product = mongoose.model('Product', ProductSchema);
-
-// Export the Product model
 
 
 const router = express.Router();
 
-// Middleware for authenticating the token
 const authenticateToken = (req, res, next) => {
     const token = req.header('Authorization')?.split(' ')[1];
     if (!token) return res.status(401).json({ error: 'Access denied. No token provided.' });
@@ -34,7 +30,6 @@ const authenticateToken = (req, res, next) => {
     }
 };
 
-// Route to create a new product
 router.post('/', authenticateToken, async (req, res) => {
     const { productName, categoryType, amount } = req.body;
     const businessName = req.user.business; // Assuming the user object has the business name
@@ -92,10 +87,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
 // Route to update a product by ID (PUT - full update)
 router.put('/:id', authenticateToken, async (req, res) => {
-    const { productName, categoryType } = req.body;
+    const { productName, categoryType, amount } = req.body;
     const businessName = req.user.business;
 
-    // Validate required fields
     if (!productName || !categoryType) {
         return res.status(400).json({ error: 'Product Name and Category Type are required.' });
     }
@@ -103,7 +97,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     try {
         const updatedProduct = await Product.findByIdAndUpdate(
             req.params.id,
-            { productName, categoryType, businessName },
+            { productName, categoryType, businessName, amount }, 
             { new: true, runValidators: true }
         );
 
@@ -116,6 +110,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+
 
 // Route to partially update a product by ID (PATCH)
 router.patch('/:id', authenticateToken, async (req, res) => {
@@ -139,13 +134,24 @@ router.patch('/:id', authenticateToken, async (req, res) => {
 });
 
 // Route to delete a product by ID
-router.delete('/:id', authenticateToken, async (req, res) => {
+router.delete('/', authenticateToken, async (req, res) => {
     try {
-        const deletedProduct = await Product.findByIdAndDelete(req.params.id);
-        if (!deletedProduct) {
-            return res.status(404).json({ error: 'Product not found.' });
+        const { ids } = req.body;
+
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'Please provide an array of product IDs to delete.' });
         }
-        res.status(200).json({ message: 'Product deleted successfully.', deletedProduct });
+
+        const deleteResult = await Product.deleteMany({ _id: { $in: ids } });
+
+        if (deleteResult.deletedCount === 0) {
+            return res.status(404).json({ error: 'No products found to delete with the provided IDs.' });
+        }
+
+        res.status(200).json({
+            message: `${deleteResult.deletedCount} product(s) deleted successfully.`,
+            deletedCount: deleteResult.deletedCount,
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

@@ -7,6 +7,7 @@ const login = require('./api/login');
 const sendEmail = require('./api/mail');
 const category = require('./api/category');
 const products = require('./api/products');
+const customer = require('./api/customer')
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/signup', signup);
 app.use('/api/signin', login); 
 app.use('/api/categories', category);
 app.use('/api/products', products);
+app.use('/api/customer', customer);
 
 // Email Endpoint
 app.post('/send-email', (req, res) => {

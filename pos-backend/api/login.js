@@ -1,6 +1,5 @@
-// routes/login.js
 
-require('dotenv').config(); // Load environment variables
+require('dotenv').config();
 
 const express = require('express');
 const Joi = require('joi');
@@ -35,7 +34,7 @@ router.post('/', async (req, res) => {
 
     const payload = { userId: user._id, username: user.username, emailId: user.emailId,business: user.businessName };    
 
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign(payload, process.env.JWT_SECRET,  { expiresIn: 8 * 60 * 60 });
 
     res.status(200).json({
       message: 'Login successful',  
